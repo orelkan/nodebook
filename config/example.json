@@ -1,0 +1,7 @@
+{
+  "oracle": {
+    "user": "userName",
+    "password": "pass",
+    "connectString": "connect"
+  }
+}
