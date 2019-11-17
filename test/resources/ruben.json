@@ -1,0 +1,10 @@
+{
+  "first_name": "Ruben",
+  "last_name": "Cohen",
+  "phone_number": "0542342123",
+  "location": { "x": 31.5, "y": 33 },
+  "gender": "male",
+  "relationship_status": "in a relationship",
+  "interested_in": "female",
+  "hobbies": ["Programming", "Boxing"]
+}

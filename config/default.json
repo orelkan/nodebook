@@ -1,0 +1,5 @@
+{
+  "postgres": {
+    "connectionString": "postgresql://me:1234@localhost:5432/testDb"
+  }
+}

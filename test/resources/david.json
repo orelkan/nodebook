@@ -1,0 +1,10 @@
+{
+  "first_name": "David",
+  "last_name": "Cohen",
+  "phone_number": "0549803401",
+  "location": { "x": 28, "y": 32.1 },
+  "gender": "male",
+  "relationship_status": "single",
+  "interested_in": "female",
+  "hobbies": ["Rotem", "DB", "Programming"]
+}

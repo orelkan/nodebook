@@ -1,0 +1,10 @@
+{
+  "first_name": "Roni",
+  "last_name": "Gordin",
+  "phone_number": "0542193892",
+  "location": { "x": 40, "y": 50},
+  "gender": "female",
+  "relationship_status": "single",
+  "interested_in": "male",
+  "hobbies": ["Programming", "Music"]
+}

@@ -1,0 +1,10 @@
+{
+  "first_name": "Orel",
+  "last_name": "Kanditan",
+  "phone_number": "0542938921",
+  "location": { "x": 30.5, "y": 32.6 },
+  "gender": "male",
+  "relationship_status": "single",
+  "interested_in": "female",
+  "hobbies": ["Karate", "Guitar", "Programming"]
+}
