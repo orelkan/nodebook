@@ -9,8 +9,8 @@ async function createUser(req, res) {
   if (!isEqual(Object.keys(userData).sort(), validCreateUserKeys.sort())) {
     return res.status(BAD_REQUEST).send({
       message: 'Some keys are invalid. Make sure to send exactly the right keys',
-      validCreateUserKeys }
-    );
+      validCreateUserKeys
+    });
   }
   try {
     const id = await dal.createUser(userData);

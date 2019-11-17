@@ -2,6 +2,7 @@ const logger = require('./logger');
 const { INTERNAL_SERVER_ERROR, BAD_REQUEST } = require('http-status');
 
 // Error handler function in Express is defined by getting 4 parameters
+// eslint-disable-next-line no-unused-vars
 module.exports = function (err, req, res, next) {
   if (err.message && err.message.includes('invalid input') ||
       err.message.includes('does not exist')) {

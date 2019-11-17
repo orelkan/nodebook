@@ -1,5 +1,5 @@
 const { db } = require('./models');
-const { USERS, HOBBIES, FRIENDS } = require('./consts').tableNames;
+const { USERS, HOBBIES } = require('./consts').tableNames;
 
 async function connect() {
   return await db.connect();

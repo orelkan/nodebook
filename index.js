@@ -7,11 +7,11 @@ const port = process.env.PORT || '5000';
 app.use(express.json());
 app.use(morgan('dev'));
 
-app.use('/', require('./routes/userRouter'));
-app.use(require('./errorHandler'));
+app.use('/', require('./src/routes/userRouter'));
+app.use(require('./src/errorHandler'));
 
-app.get('/', (req, res) => {
-  res.status(200).send('Nodebook server');
+app.get('/isAlive', (req, res) => {
+  res.send('Nodebook server');
 });
 
 module.exports = app.listen(port, () => {

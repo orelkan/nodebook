@@ -1,4 +1,4 @@
-const dal = require('../../dal');
+const dal = require('../../src/dal');
 const chai = require('chai');
 const chaiAsPromised = require('chai-as-promised');
 chai.use(chaiAsPromised);

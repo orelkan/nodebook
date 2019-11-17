@@ -7,7 +7,7 @@ chai.use(chaiAsPromised);
 const { expect } = chai;
 const { sortBy, omit } = require('lodash');
 const { CREATED, OK, NOT_FOUND, CONFLICT, BAD_REQUEST } = require('http-status');
-const dal = require('../../dal');
+const dal = require('../../src/dal');
 const { users } = require('../resources');
 
 const route = '/user';
