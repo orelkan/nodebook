@@ -8,5 +8,5 @@ module.exports = createLogger({
     format.colorize(),
     format.simple()
   ),
-  defaultMeta: { service: 'nodebook-server' },
+  // defaultMeta: { service: 'nodebook-server' },
 });

@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
+    "migrate": "node migrate.js",
     "test": "mocha --recursive test"
   },
   "repository": {

@@ -1,8 +1,9 @@
 const { db } = require('./models');
-const { USERS, HOBBIES } = require('./consts').tableNames;
+const { flatMap } = require('lodash');
+const { USERS, HOBBIES, FRIENDS } = require('./consts').tableNames;
 
 async function connect() {
-  return await db.connect();
+  return db.connect();
 }
 
 async function getUserById(userId) {
@@ -22,8 +23,7 @@ async function createUser(userData) {
     first_name, last_name, phone_number, location, gender,
     relationship_status, interested_in, hobbies
   } = userData;
-  const { x, y } = location || {};
-  const locationString = `(${x},${y})`;
+  const locationString = stringifyLocation(location);
 
   const result = await db.query(
     `INSERT INTO ${USERS} ` +
@@ -37,43 +37,95 @@ async function createUser(userData) {
 
   // Inserting hobbies if they exist
   if (hobbies && hobbies[0]) {
-    const hobbiesInsert = hobbies.map(hobby => `('${id}','${hobby}')`).join(',');
-    await db.query(`INSERT INTO ${HOBBIES} (user_id, hobby) values ${hobbiesInsert}`);
+    await insertHobbies(id, hobbies);
   }
 
   return id;
+}
+
+async function insertHobbies(userId, hobbies) {
+  const hobbiesInsert = hobbies.map(hobby => `(${userId},'${hobby}')`).join(',');
+  return db.query(`INSERT INTO ${HOBBIES} (user_id, hobby) values ${hobbiesInsert}`);
+}
+
+async function deleteHobbies(userId) {
+  return db.query(`DELETE FROM ${HOBBIES} WHERE user_id=$1`, [userId]);
+}
+
+function stringifyLocation(locationObj) {
+  const { x, y } = locationObj;
+  return `(${x},${y})`;
+}
+
+function makeUpdateQuery(updateData) {
+  return Object.entries(updateData)
+    .filter(([key]) => key !== 'hobbies')
+    .map(([key, val]) => key === 'location' ?
+      `${key}=point${stringifyLocation(val)}` :
+      `${key}='${val}'`)
+    .join(',');
+}
+
+// Returns the number of affected rows
+async function updateUser(id, updateData) {
+  // It's better if it'll be a transaction
+  const updateQuery = makeUpdateQuery(updateData);
+  const result = await db.query(`UPDATE ${USERS} SET ${updateQuery} WHERE id=$1`, [id]);
+  if (updateData.hobbies instanceof Array) {
+    await deleteHobbies(id);
+    await insertHobbies(id, updateData.hobbies);
+  }
+  return result.rowCount;
+}
+
+function makeWhereQuery(queryObj) {
+  if (!queryObj) return ['', []];
+
+  const keys = Object.keys(queryObj).filter(key => key !== 'hobbies');
+
+  // Note that values are in the same order as the keys
+  const values = keys
+    .map(key => key === 'location' ?
+      stringifyLocation(queryObj[key]) :
+      queryObj[key]
+    );
+
+  const whereQuery = keys
+    .map((key, i) => key === 'location' ?
+      `${key}~=$${i+1}` :
+      `${key}=$${i+1}`
+    ).join(' AND ');
+
+  return [whereQuery, values];
 }
 
 async function deleteUserById(userId) {
   await db.query(`DELETE FROM ${USERS} WHERE id=$1`, [userId]);
 }
 
-function makeWhereQuery(query) {
-  if (!query) return ['', []];
-
-  const keys = Object.keys(query).filter(key => key !== 'hobbies');
-
-  // Note that values are in the same order as the keys
-  const values = keys.map(key => key === 'location' ?
-    `${query[key].x},${query[key].y}` :
-    query[key]
-  );
-  const whereQuery = keys
-    .map((key, i) => key === 'location' ?
-      `${key}~=$${i+1}` :
-      `${key}=$${i+1}`
-    )
-    .join(' AND ');
-  return [whereQuery, values];
-}
-
-async function getUsersByQuery(query) {
-  const [whereQuery, values] = makeWhereQuery(query);
+async function getUsersByQuery(queryObj) {
+  const [whereQuery, values] = makeWhereQuery(queryObj);
   const fullQuery = whereQuery ?
     `SELECT id FROM ${USERS} WHERE ${whereQuery}` :
     `SELECT id FROM ${USERS}`;
   const result = await db.query(fullQuery, values);
   return Promise.all(result.rows.map(r => r.id).map(getUserById));
+}
+
+async function saveFriends(id, friendIds) {
+  const baseQuery = `INSERT INTO ${FRIENDS} (user_id1, user_id2) VALUES `;
+  const valuesQuery = flatMap(friendIds,
+    friendId => [`(${id},${friendId})`, `(${friendId},${id})`]
+  ).join(',');
+  const query = baseQuery + valuesQuery;
+  await db.query(query);
+}
+
+async function getFriendsById(id) {
+  const result =
+    await db.query(`SELECT user_id2 FROM ${FRIENDS} WHERE user_id1=$1`,[id]);
+
+  return Promise.all(result.rows.map(r => r.user_id2).map(getUserById));
 }
 
 // Used for tests
@@ -83,16 +135,19 @@ async function clearTables() {
 
 // Used for tests
 async function createUsers(usersData) {
-  await Promise.all(usersData.map(createUser));
+  return Promise.all(usersData.map(createUser));
 }
 
 module.exports = {
+  connect,
   getUserById,
   createUser,
   clearTables,
   deleteUserById,
   getUsersByQuery,
+  saveFriends,
   createUsers,
-  connect
+  getFriendsById,
+  updateUser
 };
 
