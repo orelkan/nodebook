@@ -41,6 +41,7 @@ async function updateUser(req, res) {
     return respondDataKeysAreInvalid(res);
   }
   const result = await dal.updateUser(id, updateData);
+  logger.info(`Update user - ${result} rows affected`);
   if (result) res.status(OK).end();
   else res.status(NOT_FOUND).end();
 }

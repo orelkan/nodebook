@@ -1,17 +1,17 @@
 -- Table: public."FRIENDS"
 
-DROP TABLE public."FRIENDS" CASCADE;
+DROP TABLE public.friends CASCADE;
 
-CREATE TABLE public."FRIENDS"
+CREATE TABLE public.friends
 (
     user_id1 integer NOT NULL,
     user_id2 integer NOT NULL,
     CONSTRAINT friends_fk1 FOREIGN KEY (user_id1)
-        REFERENCES public."USERS" (id) MATCH SIMPLE
+        REFERENCES public.users (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
     CONSTRAINT friends_fk2 FOREIGN KEY (user_id2)
-        REFERENCES public."USERS" (id) MATCH SIMPLE
+        REFERENCES public.users (id) MATCH SIMPLE
         ON UPDATE NO ACTION
         ON DELETE CASCADE,
     CONSTRAINT friends_check CHECK (user_id1 <> user_id2),
@@ -20,5 +20,5 @@ CREATE TABLE public."FRIENDS"
 
 TABLESPACE pg_default;
 
-ALTER TABLE public."FRIENDS"
+ALTER TABLE public.friends
     OWNER to me;

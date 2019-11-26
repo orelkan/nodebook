@@ -1,8 +1,8 @@
 -- Table: public."USERS"
 
-DROP TABLE public."USERS" CASCADE;
+DROP TABLE public.users CASCADE;
 
-CREATE TABLE public."USERS"
+CREATE TABLE public.users
 (
     id integer NOT NULL GENERATED ALWAYS AS IDENTITY ( INCREMENT 1 START 1 MINVALUE 1 MAXVALUE 99999999 CACHE 1 ),
     first_name character varying(50) COLLATE pg_catalog."default" NOT NULL,
@@ -19,5 +19,5 @@ CREATE TABLE public."USERS"
 
 TABLESPACE pg_default;
 
-ALTER TABLE public."USERS"
+ALTER TABLE public.users
     OWNER to me;

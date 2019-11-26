@@ -1,7 +1,7 @@
 exports.tableNames = {
-  USERS: '"USERS"',
-  HOBBIES: '"HOBBIES"',
-  FRIENDS: '"FRIENDS"'
+  USERS: 'users',
+  HOBBIES: 'hobbies',
+  FRIENDS: 'friends'
 };
 
 exports.validUserKeys = [

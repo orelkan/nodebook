@@ -26,12 +26,15 @@ describe('User end-to-end test', function () {
   const sortUsers = users => sortBy(users, 'phone_number');
 
   // Omits id from usersResult and compares them to expected unordered
+  // Also sorts the inner hobbies arrays to compare these unordered
   function assertResultUsersEqualsExpected(resultUsers, expectedUsers) {
     expect(resultUsers).to.have.length(expectedUsers.length);
     resultUsers.forEach(resultUser => expect(resultUser).to.have.property('id'));
 
-    const resultUsersWithoutId = resultUsers.map(user => omit(user, 'id'));
-    expect(sortUsers(resultUsersWithoutId)).to.deep.equal(sortUsers(expectedUsers));
+    const withSortedHobbies = user => ({ ...user, hobbies: user.hobbies.sort() });
+    const resultUsersWithoutId = resultUsers.map(user => withSortedHobbies(omit(user, 'id')));
+    const sortedExpectedWithSortedHobbies = sortUsers(expectedUsers.map(withSortedHobbies));
+    expect(sortUsers(resultUsersWithoutId)).to.deep.equal(sortedExpectedWithSortedHobbies);
   }
 
   it('GET user/:id & POST user: Can get and create user', async () => {
@@ -170,6 +173,17 @@ describe('User end-to-end test', function () {
         .send({ first_name: 'yaniv' }).expect(NOT_FOUND);
     });
 
+    it('Will try to put empty hobbies array', async () => {
+      const id = await createUser(users[0]);
+      const updateData = { hobbies: [] };
+      await server.patch(`${route}/${id}`).send(updateData).expect(OK);
+
+      const updatedUser = (await server.get(`${route}/${id}`).expect(OK)).body;
+      expect(updatedUser).to.deep.equal({
+        id, ...users[0], ...updateData
+      });
+    });
+
     it('Will successfully patch user', async () => {
       const id = await createUser(users[0]);
       const updateData = {
@@ -184,7 +198,7 @@ describe('User end-to-end test', function () {
       };
       await server.patch(`${route}/${id}`).send(updateData).expect(OK);
 
-      const updatedUser = (await server.get(`${route}/${id}`)).body;
+      const updatedUser = (await server.get(`${route}/${id}`).expect(OK)).body;
       expect(updatedUser).to.deep.equal({
         id, ...users[0], ...updateData
       });
