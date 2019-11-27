@@ -1,6 +1,6 @@
 -- Table: public."USERS"
 
-DROP TABLE public.users CASCADE;
+DROP TABLE IF EXISTS public.users CASCADE;
 
 CREATE TABLE public.users
 (

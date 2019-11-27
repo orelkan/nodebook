@@ -5,6 +5,11 @@ async function connect() {
   return db.connect();
 }
 
+async function userIdExists(userId) {
+  const result = await db.query('SELECT id FROM users WHERE id=$1', [userId]);
+  return Boolean(result.rowCount);
+}
+
 async function getUserById(userId) {
   const result = await getUsersByQuery({ id: userId });
   return result[0];
@@ -17,6 +22,7 @@ async function createUser(userData) {
   } = userData;
   const locationString = stringifyLocation(location);
 
+  // Would be better as a transaction
   const result = await db.query(
     `INSERT INTO users
     (first_name, last_name, phone_number,
@@ -40,7 +46,6 @@ async function insertHobbies(userId, hobbies) {
   return db.query(`INSERT INTO hobbies (user_id, hobby) values ${hobbiesInsert}`);
 }
 
-// TODO: seems like deleting hobbies deletes the user. fix
 async function deleteHobbies(userId) {
   return db.query('DELETE FROM hobbies WHERE user_id=$1', [userId]);
 }
@@ -108,22 +113,17 @@ async function deleteUserById(userId) {
 function parseRows(rows) {
   return rows.map(user => ({
     ...user,
-    hobbies: user.hobbies.split(',')
+    hobbies: user.hobbies ? user.hobbies.split(',') : []
   }));
 }
 
 async function getUsersByQuery(queryObj) {
   const [whereQuery, values] = makeWhereQuery(queryObj);
+  const fullWhereQuery = whereQuery ? `WHERE ${whereQuery}` : '';
 
-  // In PostgresSQL STRING_AGG concats the string values by delimiter.
+  // The View uses PostgresSQL's STRING_AGG, which concats the string values by delimiter.
   // In Oracle SQL it's called list_agg
-  const fullQuery =
-    `SELECT
-       u.id, u.first_name, u.last_name, u.phone_number, u.location, u.gender,
-       u.relationship_status, u.interested_in, STRING_AGG(h.hobby, ',') AS hobbies
-     FROM users AS u JOIN hobbies AS h ON u.id=h.user_id 
-     ${whereQuery ? `WHERE ${whereQuery}` : ''}
-     GROUP BY u.id`;
+  const fullQuery = `SELECT * FROM users_view ${fullWhereQuery}`;
   const result = await db.query(fullQuery, values);
   return parseRows(result.rows);
 }
@@ -138,23 +138,55 @@ async function saveFriends(id, friendIds) {
 }
 
 async function getFriendsById(id) {
-  const query =
-    `SELECT
-       u.id, u.first_name, u.last_name, u.phone_number, u.location, u.gender,
-       u.relationship_status, u.interested_in, STRING_AGG(h.hobby, ',') AS hobbies
-     FROM users AS u 
-     JOIN hobbies AS h ON u.id=h.user_id
-     JOIN friends AS f ON u.id=f.user_id2 
+  const query = `
+     SELECT u.*
+     FROM users_view u 
+     JOIN friends f ON u.id=f.user_id2 
      WHERE f.user_id1=$1
-     GROUP BY u.id`;
+  `;
 
   const result = await db.query(query,[id]);
   return parseRows(result.rows);
 }
 
-// Used for tests
 async function clearTables() {
-  await db.query('DELETE FROM users');
+  await db.query('TRUNCATE TABLE users CASCADE');
+}
+
+async function getFriendSuggestions(id) {
+  const query = `
+     WITH user_friends AS (
+       SELECT user_id2 AS id FROM friends WHERE user_id1=$1
+     ), user_friends_friends AS (
+       SELECT f.user_id2 as id
+       FROM user_friends uf 
+       JOIN friends f ON uf.id = f.user_id1
+       WHERE f.user_id2 NOT IN (SELECT * FROM user_friends)
+     )
+     
+     SELECT u.*
+     FROM users_view u 
+     JOIN user_friends_friends uff ON u.id=uff.id 
+     WHERE u.id!=$1
+  `;
+  const result = await db.query(query, [id]);
+  return parseRows(result.rows);
+}
+
+async function getUserMatches(id) {
+  const user = await getUserById(id);
+  const { interested_in } = user;
+  const query = `
+     SELECT *
+     FROM users_view 
+     WHERE 
+        id != $1 
+        AND gender = $2 
+        AND relationship_status = $3 
+  `;
+  const result = await db.query(query, [id, interested_in, 'single']);
+  // TODO: sort result by the requirements (common hobbies, distance)
+  return parseRows(result.rows);
 }
 
 // Used for tests
@@ -172,6 +204,9 @@ module.exports = {
   saveFriends,
   createUsers,
   getFriendsById,
-  updateUser
+  updateUser,
+  getFriendSuggestions,
+  userIdExists,
+  getUserMatches
 };
 

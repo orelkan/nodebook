@@ -1,6 +1,6 @@
 -- Table: public."FRIENDS"
 
-DROP TABLE public.friends CASCADE;
+DROP TABLE IF EXISTS public.friends CASCADE;
 
 CREATE TABLE public.friends
 (

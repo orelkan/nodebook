@@ -99,7 +99,30 @@ async function getFriends(req, res) {
   else res.status(NOT_FOUND).end();
 }
 
+async function deleteUsers(req, res) {
+  await dal.clearTables();
+  res.status(OK).end();
+}
+
+async function getFriendSuggestions(req, res) {
+  const { id } = req.params;
+  const userExists = await dal.userIdExists(id);
+  if (!userExists) return res.status(NOT_FOUND).end();
+
+  const suggestions = await dal.getFriendSuggestions(id);
+  res.send(suggestions);
+}
+
+async function getUserMatches(req, res) {
+  const { id } = req.params;
+  const userExists = await dal.userIdExists(id);
+  if (!userExists) return res.status(NOT_FOUND).end();
+
+  const matches = await dal.getUserMatches(id);
+  res.send(matches);
+}
+
 module.exports = {
-  createUser,  getUserById, deleteUserById, 
-  getUsersByQuery, postFriends, getFriends, updateUser
+  createUser,  getUserById, deleteUserById, deleteUsers, getUserMatches,
+  getUsersByQuery, postFriends, getFriends, updateUser, getFriendSuggestions
 };

@@ -1,6 +1,6 @@
 -- Table: public."HOBBIES"
 
-DROP TABLE public.hobbies CASCADE;
+DROP TABLE IF EXISTS public.hobbies CASCADE;
 
 CREATE TABLE public.hobbies
 (

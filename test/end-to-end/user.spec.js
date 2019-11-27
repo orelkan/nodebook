@@ -55,6 +55,16 @@ describe('User end-to-end test', function () {
     it('Will get Not Found for an unknown id', () => {
       return server.get(`${route}/3`).expect(NOT_FOUND);
     });
+
+    it('Will get a user with empty hobbies', async () => {
+      const user = {
+        ...users[0], hobbies: []
+      };
+      const userId = await createUser(user);
+      const { body: resultUser } = await server.get(`${route}/${userId}`).expect(OK);
+      const expected = { ...user, id: userId };
+      expect(resultUser).to.deep.equal(expected);
+    });
   });
 
   describe('DELETE user/:id', () => {
@@ -77,6 +87,12 @@ describe('User end-to-end test', function () {
   describe('POST user', () => {
     it('Will give CREATED status for creating valid user', () => {
       return server.post(route).send(users[0]).expect(CREATED);
+    });
+
+    it('Will give CREATED status for creating a user with empty hobbies', () => {
+      return server.post(route).send({
+        ...users[0], hobbies: []
+      }).expect(CREATED);
     });
 
     it('Will give CONFLICT error for creating the same user twice', async () => {
@@ -155,6 +171,25 @@ describe('User end-to-end test', function () {
 
     it('Will give bad request status code for invalid enum query param', async () => {
       await server.get(usersRoute).query({ gender: 'mal' }).expect(BAD_REQUEST);
+    });
+  });
+
+  describe('DELETE users', () => {
+    it('Will give status OK', async () => {
+      await server.delete('/users').expect(OK);
+    });
+
+    it('Will delete all users', async () => {
+      const ids = await createUsers(users);
+      await Promise.all(ids.map(id => {
+        return server.get(`${route}/${id}`).expect(OK);
+      }));
+
+      await server.delete('/users').expect(OK);
+
+      await Promise.all(ids.map(id => {
+        return server.get(`${route}/${id}`).expect(NOT_FOUND);
+      }));
     });
   });
 
@@ -272,6 +307,78 @@ describe('User end-to-end test', function () {
       // eslint-disable-next-line no-unused-vars
       const [_, ...friends] = users;
       assertResultUsersEqualsExpected(friendsResult, friends);
+    });
+  });
+
+  describe('GET user/:id/suggestions', () => {
+    it('Will give not found error when user doesnt exist', async () => {
+      await server.get(`${route}/12/suggestions`).expect(NOT_FOUND);
+    });
+
+    it('Will give an empty array when user has no friends', async () => {
+      const id = await createUser(users[0]);
+      await server.get(`${route}/${id}/suggestions`).expect(OK, []);
+    });
+
+    it('Will give 1 correct suggestion', async () => {
+      const [user1, user2, user3] = users;
+      const [id1, id2, id3] = await createUsers([user1, user2, user3]);
+
+      await server.post(`${route}/${id1}/friends`).send([id2]).expect(CREATED);
+      await server.post(`${route}/${id2}/friends`).send([id3]).expect(CREATED);
+
+      const result = await server.get(`${route}/${id1}/suggestions`).expect(OK);
+      expect(result.body).to.deep.equal([{ ...user3, id: id3 }]);
+    });
+
+    it('Will give 1 correct suggestion without repetition', async () => {
+      const [user1, user2, user3, user4] = users;
+      const [id1, id2, id3, id4] = await createUsers([user1, user2, user3, user4]);
+
+      // Both 2 and 4 are friends with 3, but I expect to only receive it once
+      await server.post(`${route}/${id1}/friends`).send([id2]).expect(CREATED);
+      await server.post(`${route}/${id2}/friends`).send([id3]).expect(CREATED);
+      await server.post(`${route}/${id4}/friends`).send([id3]).expect(CREATED);
+
+      const result = await server.get(`${route}/${id1}/suggestions`).expect(OK);
+      assertResultUsersEqualsExpected(result.body, [user3]);
+    });
+
+    it('Will give several correct suggestions', async () => {
+      const [user1, user2, user3, user4] = users;
+      const [id1, id2, id3, id4] = await createUsers([user1, user2, user3, user4]);
+
+      // Now 2 and 4 are also friends. I expect to get 4 as well
+      await server.post(`${route}/${id1}/friends`).send([id2]).expect(CREATED);
+      await server.post(`${route}/${id2}/friends`).send([id3]).expect(CREATED);
+      await server.post(`${route}/${id4}/friends`).send([id3]).expect(CREATED);
+      await server.post(`${route}/${id2}/friends`).send([id4]).expect(CREATED);
+
+      const result = await server.get(`${route}/${id1}/suggestions`).expect(OK);
+      assertResultUsersEqualsExpected(result.body, [user3, user4]);
+    });
+
+  });
+
+  describe('GET user/:id/matches', () => {
+    it('Will give not found error when user doesnt exist', async () => {
+      await server.get(`${route}/12/matches`).expect(NOT_FOUND);
+    });
+
+    it('Will give no matches when only 1 user', async () => {
+      const id = await createUser(users[0]);
+      await server.get(`${route}/${id}/matches`).expect(OK, []);
+    });
+
+    it('Will give 1 match', async () => {
+      // These 2 can match
+      const [user1, user2] = [users[0], users[2]];
+      const [id1, id2] = await createUsers([user1, user2]);
+
+      const result1 = await server.get(`${route}/${id1}/matches`).expect(OK);
+      const result2 = await server.get(`${route}/${id2}/matches`).expect(OK);
+      assertResultUsersEqualsExpected(result1.body, [user2]);
+      assertResultUsersEqualsExpected(result2.body, [user1]);
     });
   });
 });

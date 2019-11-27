@@ -1,7 +1,8 @@
 const { db } = require('./src/models');
 const fs = require('fs');
 const path = require('path');
-const sqlFileNames = ['gender', 'relationship_status', 'users', 'hobbies', 'friends'];
+const sqlFileNames = ['gender', 'relationship_status', 'users',
+  'hobbies', 'friends', 'users_view'];
 
 async function migrate() {
   for (let fileName of sqlFileNames) {
