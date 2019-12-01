@@ -1,0 +1,10 @@
+{
+  "first_name": "Moses",
+  "last_name": "Levi",
+  "phone_number": "05829831238",
+  "location": { "x": 28, "y": 34 },
+  "gender": "male",
+  "relationship_status": "single",
+  "interested_in": "female",
+  "hobbies": ["Rocks", "Prophecies"]
+}

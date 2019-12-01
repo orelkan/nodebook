@@ -25,13 +25,14 @@ describe('User end-to-end test', function () {
 
   const sortUsers = users => sortBy(users, 'phone_number');
 
+  const withSortedHobbies = user => ({ ...user, hobbies: user.hobbies.sort() });
+
   // Omits id from usersResult and compares them to expected unordered
   // Also sorts the inner hobbies arrays to compare these unordered
   function assertResultUsersEqualsExpected(resultUsers, expectedUsers) {
     expect(resultUsers).to.have.length(expectedUsers.length);
     resultUsers.forEach(resultUser => expect(resultUser).to.have.property('id'));
 
-    const withSortedHobbies = user => ({ ...user, hobbies: user.hobbies.sort() });
     const resultUsersWithoutId = resultUsers.map(user => withSortedHobbies(omit(user, 'id')));
     const sortedExpectedWithSortedHobbies = sortUsers(expectedUsers.map(withSortedHobbies));
     expect(sortUsers(resultUsersWithoutId)).to.deep.equal(sortedExpectedWithSortedHobbies);
@@ -293,6 +294,13 @@ describe('User end-to-end test', function () {
         .expect(NOT_FOUND);
     });
 
+    it('Will get an empty array for user that has no friends', async () => {
+      const id = await createUser(users[0]);
+      return server
+        .get(`${route}/${id}/friends`)
+        .expect(OK, []);
+    });
+
     it('Will post and get friends successfully', async () => {
       const ids = await createUsers(users);
       const [id, ...friendsIds] = ids;
@@ -379,6 +387,21 @@ describe('User end-to-end test', function () {
       const result2 = await server.get(`${route}/${id2}/matches`).expect(OK);
       assertResultUsersEqualsExpected(result1.body, [user2]);
       assertResultUsersEqualsExpected(result2.body, [user1]);
+    });
+
+    it('Will give several matches', async () => {
+      const ids = await createUsers(users);
+      const targetId = ids[2];
+      const result = await server.get(`${route}/${targetId}/matches`).expect(OK);
+
+      // In that order
+      const expected = [0, 3, 4].map(i => ({
+        ...users[i],
+        id: ids[i]
+      }));
+
+      expect(result.body.map(withSortedHobbies))
+        .to.deep.equal(expected.map(withSortedHobbies));
     });
   });
 });

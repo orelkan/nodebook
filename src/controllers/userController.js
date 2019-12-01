@@ -1,12 +1,13 @@
+const { CREATED, OK, NOT_FOUND, CONFLICT, BAD_REQUEST } = require('http-status');
+const { isEqual, isEmpty } = require('lodash');
 const dal = require('../dal');
 const logger = require('../logger');
-const { CREATED, OK, NOT_FOUND, CONFLICT, BAD_REQUEST } = require('http-status');
+const { sortUserMatches, isSubsetOf } = require('./userLogic');
 const { validCreateUserKeys } = require('../consts');
-const { isEqual, isEmpty } = require('lodash');
 
 async function createUser(req, res) {
   const userData = req.body;
-  if (createDataInvalid(userData)) {
+  if (createDataIsInvalid(userData)) {
     return respondDataKeysAreInvalid(res);
   } try {
     const id = await dal.createUser(userData);
@@ -20,14 +21,14 @@ async function createUser(req, res) {
   }
 }
 
-const createDataInvalid = data =>
+const createDataIsInvalid = data =>
   !isEqual(Object.keys(data).sort(), validCreateUserKeys.sort());
 
-const isSubsetOf = (fullCollection, subsetCollection) =>
-  subsetCollection.every(val => fullCollection.includes(val));
-
-const updateDataInvalid = data =>
+const updateDataIsInvalid = data =>
   isEmpty(data) || !isSubsetOf(validCreateUserKeys, Object.keys(data));
+
+const getUsersQueryIsInvalid = data =>
+  !isSubsetOf(validCreateUserKeys, Object.keys(data));
 
 const respondDataKeysAreInvalid = res => res.status(BAD_REQUEST).send({
   message: 'Some keys are invalid. Make sure to send exactly the right keys',
@@ -37,11 +38,11 @@ const respondDataKeysAreInvalid = res => res.status(BAD_REQUEST).send({
 async function updateUser(req, res) {
   const { id } = req.params;
   const updateData = req.body;
-  if (updateDataInvalid(updateData)) {
+  if (updateDataIsInvalid(updateData)) {
     return respondDataKeysAreInvalid(res);
   }
   const result = await dal.updateUser(id, updateData);
-  logger.info(`Update user - ${result} rows affected`);
+  logger.info(`Update user ${id}: ${result} rows affected`);
   if (result) res.status(OK).end();
   else res.status(NOT_FOUND).end();
 }
@@ -61,8 +62,10 @@ async function deleteUserById(req, res) {
 }
 
 async function getUsersByQuery(req, res) {
-  const result = await dal.getUsersByQuery(req.query);
-  res.send(result);
+  if (getUsersQueryIsInvalid(req.query)) {
+    return respondDataKeysAreInvalid(res);
+  }
+  res.send(await dal.getUsersByQuery(req.query));
 }
 
 async function postFriends(req, res) {
@@ -93,10 +96,10 @@ async function postFriends(req, res) {
 
 async function getFriends(req, res) {
   const { id } = req.params;
-  const result = await dal.getFriendsById(id);
+  const userExists = await dal.userIdExists(id);
+  if (!userExists) return res.status(NOT_FOUND).end();
 
-  if (result.length > 0) res.send(result);
-  else res.status(NOT_FOUND).end();
+  res.send(await dal.getFriendsById(id));
 }
 
 async function deleteUsers(req, res) {
@@ -115,14 +118,24 @@ async function getFriendSuggestions(req, res) {
 
 async function getUserMatches(req, res) {
   const { id } = req.params;
-  const userExists = await dal.userIdExists(id);
-  if (!userExists) return res.status(NOT_FOUND).end();
 
-  const matches = await dal.getUserMatches(id);
-  res.send(matches);
+  const [user, matches] = await dal.getUnsortedUserMatches(id);
+  if (!user) return res.status(NOT_FOUND).end();
+
+  const { first_name, last_name } = user;
+  logger.info(`Matching ${id} ${first_name} ${last_name}`);
+  res.send(sortUserMatches(user, matches));
 }
 
 module.exports = {
-  createUser,  getUserById, deleteUserById, deleteUsers, getUserMatches,
-  getUsersByQuery, postFriends, getFriends, updateUser, getFriendSuggestions
+  createUser,
+  getUserById,
+  deleteUserById,
+  deleteUsers,
+  getUserMatches,
+  getUsersByQuery,
+  postFriends,
+  getFriends,
+  updateUser,
+  getFriendSuggestions
 };

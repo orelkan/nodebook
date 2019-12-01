@@ -68,18 +68,17 @@ function makeUpdateQuery(updateData) {
 async function updateUser(id, updateData) {
   // It's better if it'll be a transaction
   let rowCount = 0;
+  const addToCount = result => rowCount += result.rowCount;
+
   const updateQuery = makeUpdateQuery(updateData);
   if (updateQuery) {
-    const result = await db.query(`UPDATE users SET ${updateQuery} WHERE id=$1`, [id]);
-    rowCount += result.rowCount;
+    addToCount(await db.query(`UPDATE users SET ${updateQuery} WHERE id=$1`, [id]));
   }
   const { hobbies } = updateData;
   if (hobbies instanceof Array) {
-    const deleteResult = await deleteHobbies(id);
-    rowCount += deleteResult.rowCount;
+    addToCount(await deleteHobbies(id));
     if (hobbies.length > 0) {
-      const hobbiesResult = await insertHobbies(id, hobbies);
-      rowCount += hobbiesResult.rowCount;
+      addToCount(await insertHobbies(id, hobbies));
     }
   }
   return rowCount;
@@ -161,7 +160,7 @@ async function getFriendSuggestions(id) {
        SELECT f.user_id2 as id
        FROM user_friends uf 
        JOIN friends f ON uf.id = f.user_id1
-       WHERE f.user_id2 NOT IN (SELECT * FROM user_friends)
+       WHERE f.user_id2 NOT IN (SELECT id FROM user_friends)
      )
      
      SELECT u.*
@@ -173,9 +172,13 @@ async function getFriendSuggestions(id) {
   return parseRows(result.rows);
 }
 
-async function getUserMatches(id) {
+// Returns array containing [user, matches]
+// matches is an array of users
+async function getUnsortedUserMatches(id) {
   const user = await getUserById(id);
-  const { interested_in } = user;
+  if (!user) return [undefined, []];
+
+  const { interested_in, gender } = user;
   const query = `
      SELECT *
      FROM users_view 
@@ -183,10 +186,11 @@ async function getUserMatches(id) {
         id != $1 
         AND gender = $2 
         AND relationship_status = $3 
+        AND interested_in = $4
   `;
-  const result = await db.query(query, [id, interested_in, 'single']);
-  // TODO: sort result by the requirements (common hobbies, distance)
-  return parseRows(result.rows);
+  const result = await db.query(query, [id, interested_in, 'single', gender]);
+  const matches = parseRows(result.rows);
+  return [user, matches];
 }
 
 // Used for tests
@@ -207,6 +211,6 @@ module.exports = {
   updateUser,
   getFriendSuggestions,
   userIdExists,
-  getUserMatches
+  getUnsortedUserMatches
 };
 
