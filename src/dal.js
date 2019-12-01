@@ -22,7 +22,6 @@ async function createUser(userData) {
   } = userData;
   const locationString = stringifyLocation(location);
 
-  // Would be better as a transaction
   const result = await db.query(
     `INSERT INTO users
     (first_name, last_name, phone_number,
@@ -66,7 +65,6 @@ function makeUpdateQuery(updateData) {
 
 // Returns the number of affected rows
 async function updateUser(id, updateData) {
-  // It's better if it'll be a transaction
   let rowCount = 0;
   const addToCount = result => rowCount += result.rowCount;
 
