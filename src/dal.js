@@ -22,13 +22,15 @@ async function createUser(userData) {
   } = userData;
   const locationString = stringifyLocation(location);
 
-  const result = await db.query(
-    `INSERT INTO users
+  const query = `
+    INSERT INTO users
     (first_name, last_name, phone_number,
     location, gender, relationship_status, interested_in) VALUES
-    ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-    [first_name, last_name, phone_number, locationString, gender,
-      relationship_status, interested_in]);
+    ($1, $2, $3, $4, $5, $6, $7) RETURNING id
+  `;
+  const result = await db.query(query,
+    [first_name, last_name, phone_number, locationString,
+      gender, relationship_status, interested_in]);
 
   const { id } = result.rows[0];
 
@@ -136,10 +138,10 @@ async function saveFriends(id, friendIds) {
 
 async function getFriendsById(id) {
   const query = `
-     SELECT u.*
-     FROM users_view u 
-     JOIN friends f ON u.id=f.user_id2 
-     WHERE f.user_id1=$1
+    SELECT u.*
+    FROM users_view u 
+    JOIN friends f ON u.id=f.user_id2 
+    WHERE f.user_id1=$1
   `;
 
   const result = await db.query(query,[id]);
@@ -152,19 +154,19 @@ async function clearTables() {
 
 async function getFriendSuggestions(id) {
   const query = `
-     WITH user_friends AS (
-       SELECT user_id2 AS id FROM friends WHERE user_id1=$1
-     ), user_friends_friends AS (
-       SELECT f.user_id2 as id
-       FROM user_friends uf 
-       JOIN friends f ON uf.id = f.user_id1
-       WHERE f.user_id2 NOT IN (SELECT id FROM user_friends)
-     )
-     
-     SELECT u.*
-     FROM users_view u 
-     JOIN user_friends_friends uff ON u.id=uff.id 
-     WHERE u.id!=$1
+    WITH user_friends AS (
+      SELECT user_id2 AS id FROM friends WHERE user_id1=$1
+    ), user_friends_friends AS (
+      SELECT f.user_id2 as id
+      FROM user_friends uf 
+      JOIN friends f ON uf.id = f.user_id1
+      WHERE f.user_id2 NOT IN (SELECT id FROM user_friends)
+    )
+    
+    SELECT u.*
+    FROM users_view u 
+    JOIN user_friends_friends uff ON u.id=uff.id 
+    WHERE u.id!=$1
   `;
   const result = await db.query(query, [id]);
   return parseRows(result.rows);
@@ -178,13 +180,13 @@ async function getUnsortedUserMatches(id) {
 
   const { interested_in, gender } = user;
   const query = `
-     SELECT *
-     FROM users_view 
-     WHERE 
-        id != $1 
-        AND gender = $2 
-        AND relationship_status = $3 
-        AND interested_in = $4
+    SELECT *
+    FROM users_view 
+    WHERE 
+      id != $1 
+      AND gender = $2 
+      AND relationship_status = $3 
+      AND interested_in = $4
   `;
   const result = await db.query(query, [id, interested_in, 'single', gender]);
   const matches = parseRows(result.rows);
