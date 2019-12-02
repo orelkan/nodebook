@@ -1,14 +1,15 @@
 const request = require('supertest');
-const app = require('../../index');
-const server = request(app);
-const chai = require('chai');
-const chaiAsPromised = require('chai-as-promised');
-chai.use(chaiAsPromised);
-const { expect } = chai;
 const { sortBy, omit } = require('lodash');
 const { CREATED, OK, NOT_FOUND, CONFLICT, BAD_REQUEST } = require('http-status');
+const chai = require('chai');
+const chaiAsPromised = require('chai-as-promised');
+
+const app = require('../../index');
 const dal = require('../../src/dal');
 const { users } = require('../resources');
+const server = request(app);
+chai.use(chaiAsPromised);
+const { expect } = chai;
 
 const route = '/user';
 describe('User end-to-end test', function () {
@@ -21,6 +22,7 @@ describe('User end-to-end test', function () {
   async function createUsers(users) {
     return dal.createUsers(users);
   }
+
   const createUser = async user => (await createUsers([user]))[0];
 
   const sortUsers = users => sortBy(users, 'phone_number');

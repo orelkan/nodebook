@@ -36,11 +36,11 @@ async function createUser(userData) {
       [first_name, last_name, phone_number, locationString,
         gender, relationship_status, interested_in]);
 
-    const {id} = result.rows[0];
+    const { id } = result.rows[0];
 
     // Inserting hobbies if they exist
-    if (hobbies && hobbies[0]) {
-      await insertHobbies(id, hobbies, client);
+    if (hobbies && hobbies.length > 0) {
+      await insertHobbies(client)(id, hobbies);
     }
     await client.query('COMMIT');
     return id;
@@ -52,14 +52,14 @@ async function createUser(userData) {
   }
 }
 
-async function insertHobbies(userId, hobbies, client) {
+const insertHobbies = client => async (userId, hobbies) => {
   const hobbiesInsert = hobbies.map(hobby => `(${userId},'${hobby}')`).join(',');
   return client.query(`INSERT INTO hobbies (user_id, hobby) values ${hobbiesInsert}`);
-}
+};
 
-async function deleteHobbies(userId, client) {
+const deleteHobbies = client => async (userId) => {
   return client.query('DELETE FROM hobbies WHERE user_id=$1', [userId]);
-}
+};
 
 function stringifyLocation(locationObj) {
   const { x, y } = locationObj;
@@ -88,11 +88,11 @@ async function updateUser(id, updateData) {
     if (updateQuery) {
       addToCount(await client.query(`UPDATE users SET ${updateQuery} WHERE id=$1`, [id]));
     }
-    const {hobbies} = updateData;
+    const { hobbies } = updateData;
     if (hobbies instanceof Array) {
-      addToCount(await deleteHobbies(id, client));
+      addToCount(await deleteHobbies(client)(id));
       if (hobbies.length > 0) {
-        addToCount(await insertHobbies(id, hobbies, client));
+        addToCount(await insertHobbies(client)(id, hobbies));
       }
     }
     await client.query('COMMIT');
@@ -164,7 +164,6 @@ async function getFriendsById(id) {
     JOIN friends f ON u.id=f.user_id2 
     WHERE f.user_id1=$1
   `;
-
   const result = await db.query(query,[id]);
   return parseRows(result.rows);
 }
