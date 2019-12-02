@@ -16,39 +16,49 @@ async function getUserById(userId) {
 }
 
 async function createUser(userData) {
-  const {
-    first_name, last_name, phone_number, location, gender,
-    relationship_status, interested_in, hobbies
-  } = userData;
-  const locationString = stringifyLocation(location);
+  // Getting a client to start a transaction
+  const client = await connect();
+  try {
+    await client.query('BEGIN');
+    const {
+      first_name, last_name, phone_number, location, gender,
+      relationship_status, interested_in, hobbies
+    } = userData;
+    const locationString = stringifyLocation(location);
 
-  const query = `
-    INSERT INTO users
-    (first_name, last_name, phone_number,
-    location, gender, relationship_status, interested_in) VALUES
-    ($1, $2, $3, $4, $5, $6, $7) RETURNING id
-  `;
-  const result = await db.query(query,
-    [first_name, last_name, phone_number, locationString,
-      gender, relationship_status, interested_in]);
+    const query = `
+      INSERT INTO users
+      (first_name, last_name, phone_number,
+      location, gender, relationship_status, interested_in) VALUES
+      ($1, $2, $3, $4, $5, $6, $7) RETURNING id
+    `;
+    const result = await client.query(query,
+      [first_name, last_name, phone_number, locationString,
+        gender, relationship_status, interested_in]);
 
-  const { id } = result.rows[0];
+    const {id} = result.rows[0];
 
-  // Inserting hobbies if they exist
-  if (hobbies && hobbies[0]) {
-    await insertHobbies(id, hobbies);
+    // Inserting hobbies if they exist
+    if (hobbies && hobbies[0]) {
+      await insertHobbies(id, hobbies, client);
+    }
+    await client.query('COMMIT');
+    return id;
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
   }
-
-  return id;
 }
 
-async function insertHobbies(userId, hobbies) {
+async function insertHobbies(userId, hobbies, client) {
   const hobbiesInsert = hobbies.map(hobby => `(${userId},'${hobby}')`).join(',');
-  return db.query(`INSERT INTO hobbies (user_id, hobby) values ${hobbiesInsert}`);
+  return client.query(`INSERT INTO hobbies (user_id, hobby) values ${hobbiesInsert}`);
 }
 
-async function deleteHobbies(userId) {
-  return db.query('DELETE FROM hobbies WHERE user_id=$1', [userId]);
+async function deleteHobbies(userId, client) {
+  return client.query('DELETE FROM hobbies WHERE user_id=$1', [userId]);
 }
 
 function stringifyLocation(locationObj) {
@@ -67,21 +77,32 @@ function makeUpdateQuery(updateData) {
 
 // Returns the number of affected rows
 async function updateUser(id, updateData) {
-  let rowCount = 0;
-  const addToCount = result => rowCount += result.rowCount;
+  const client = await connect();
+  try {
+    await client.query('BEGIN');
 
-  const updateQuery = makeUpdateQuery(updateData);
-  if (updateQuery) {
-    addToCount(await db.query(`UPDATE users SET ${updateQuery} WHERE id=$1`, [id]));
-  }
-  const { hobbies } = updateData;
-  if (hobbies instanceof Array) {
-    addToCount(await deleteHobbies(id));
-    if (hobbies.length > 0) {
-      addToCount(await insertHobbies(id, hobbies));
+    let rowCount = 0;
+    const addToCount = result => rowCount += result.rowCount;
+
+    const updateQuery = makeUpdateQuery(updateData);
+    if (updateQuery) {
+      addToCount(await client.query(`UPDATE users SET ${updateQuery} WHERE id=$1`, [id]));
     }
+    const {hobbies} = updateData;
+    if (hobbies instanceof Array) {
+      addToCount(await deleteHobbies(id, client));
+      if (hobbies.length > 0) {
+        addToCount(await insertHobbies(id, hobbies, client));
+      }
+    }
+    await client.query('COMMIT');
+    return rowCount;
+  } catch (e) {
+    await client.query('ROLLBACK');
+    throw e;
+  } finally {
+    client.release();
   }
-  return rowCount;
 }
 
 function makeWhereQuery(queryObj) {

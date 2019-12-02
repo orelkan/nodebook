@@ -1,5 +1,9 @@
 {
   "postgres": {
     "connectionString": "postgresql://me:1234@localhost:5432/testDb"
+  },
+  "logs": {
+    "logSqlQueries": true,
+    "logSqlQueriesInConnection": false
   }
 }
