@@ -11,7 +11,9 @@ const server = request(app);
 chai.use(chaiAsPromised);
 const { expect } = chai;
 
-const route = '/user';
+const route = '/api/user';
+const usersRoute = '/api/users';
+
 describe('User end-to-end test', function () {
   this.timeout(10000);
 
@@ -32,7 +34,6 @@ describe('User end-to-end test', function () {
   // Omits id from usersResult and compares them to expected unordered
   // Also sorts the inner hobbies arrays to compare these unordered
   function assertResultUsersEqualsExpected(resultUsers, expectedUsers) {
-    expect(resultUsers).to.have.length(expectedUsers.length);
     resultUsers.forEach(resultUser => expect(resultUser).to.have.property('id'));
 
     const resultUsersWithoutId = resultUsers.map(user => withSortedHobbies(omit(user, 'id')));
@@ -71,6 +72,10 @@ describe('User end-to-end test', function () {
   });
 
   describe('DELETE user/:id', () => {
+    it('Returns status OK even for user that doesnt exist', async () => {
+      await server.delete(`${route}/20`).expect(OK);
+    });
+
     it('Can delete a created user', async () => {
       const user = users[0];
 
@@ -120,7 +125,6 @@ describe('User end-to-end test', function () {
   });
 
   describe('GET users', () => {
-    const usersRoute = '/users';
 
     it('Will get an empty array when no users', async () => {
       const { body } = await server.get(usersRoute).expect(OK);
@@ -160,7 +164,7 @@ describe('User end-to-end test', function () {
       await createUsers(users);
       const { body: resultUsers } =
         await server.get(usersRoute)
-          .query({ location: { x: 30.5, y: 32.6 }, gender: 'male' })
+          .query({ locationX: 30.5, locationY: 32.6 , gender: 'male' })
           .expect(OK);
 
       const [orel] = users.filter(user => user.last_name === 'Kanditan');
@@ -168,18 +172,56 @@ describe('User end-to-end test', function () {
       assertResultUsersEqualsExpected(resultUsers, [orel]);
     });
 
+    it('Will get users by a single hobby', async () => {
+      await createUsers(users);
+      const hobbies = ['DB'];
+      const { body: resultUsers } =
+        await server.get(usersRoute)
+          .query({ hobbies })
+          .expect(OK);
+
+      const expectedUsers = users
+        .filter(user => hobbies.every(hobby => user.hobbies.includes(hobby)));
+
+      assertResultUsersEqualsExpected(resultUsers, expectedUsers);
+    });
+
+    it('Will get users by hobbies', async () => {
+      await createUsers(users);
+      const hobbies = ['Programming', 'DB'];
+      const { body: resultUsers } =
+        await server.get(usersRoute)
+          .query({ gender: 'male', hobbies })
+          .expect(OK);
+
+      const expectedUsers = users
+        .filter(user => hobbies.every(hobby => user.hobbies.includes(hobby)));
+
+      assertResultUsersEqualsExpected(resultUsers, expectedUsers);
+    });
+
     it('Will give bad request status code for invalid query param', async () => {
-      await server.get(usersRoute).query({ invalid_param: 'Hi' }).expect(BAD_REQUEST);
+      await server.get(usersRoute)
+        .query({ invalid_param: 'Hi' })
+        .expect(BAD_REQUEST);
     });
 
     it('Will give bad request status code for invalid enum query param', async () => {
-      await server.get(usersRoute).query({ gender: 'mal' }).expect(BAD_REQUEST);
+      await server.get(usersRoute)
+        .query({ gender: 'mal' })
+        .expect(BAD_REQUEST);
+    });
+
+    it('Will give bad request status code when only locationX', async () => {
+      await server.get(usersRoute)
+        .query({ gender: 'male', locationX: 30 })
+        .expect(BAD_REQUEST);
     });
   });
 
   describe('DELETE users', () => {
     it('Will give status OK', async () => {
-      await server.delete('/users').expect(OK);
+      await server.delete(usersRoute).expect(OK);
     });
 
     it('Will delete all users', async () => {
@@ -188,7 +230,7 @@ describe('User end-to-end test', function () {
         return server.get(`${route}/${id}`).expect(OK);
       }));
 
-      await server.delete('/users').expect(OK);
+      await server.delete(usersRoute).expect(OK);
 
       await Promise.all(ids.map(id => {
         return server.get(`${route}/${id}`).expect(NOT_FOUND);
@@ -317,6 +359,29 @@ describe('User end-to-end test', function () {
       // eslint-disable-next-line no-unused-vars
       const [_, ...friends] = users;
       assertResultUsersEqualsExpected(friendsResult, friends);
+    });
+  });
+
+  describe('DELETE user/:id/friends', () => {
+    it('Will give not found error for user that doesnt exist', () => {
+      return server
+        .get(`${route}/10/friends`)
+        .expect(NOT_FOUND);
+    });
+
+    it('Will delete friends successfully', async () => {
+      const ids = await createUsers(users);
+      const [id, ...friendsIds] = ids;
+      await server
+        .post(`${route}/${id}/friends`)
+        .send(friendsIds).expect(CREATED);
+
+      await server
+        .delete(`${route}/${id}/friends`)
+        .expect(OK);
+
+      await server.get(`${route}/${id}/friends`).expect(OK, []);
+
     });
   });
 

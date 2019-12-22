@@ -7,7 +7,7 @@ const port = process.env.PORT || '5000';
 app.use(express.json());
 app.use(morgan('dev'));
 
-app.use('/', require('./src/routes/userRouter'));
+app.use('/api', require('./src/routes/userRouter'));
 app.use(require('./src/errorHandler'));
 
 app.get('/isAlive', (req, res) => {

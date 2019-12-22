@@ -3,7 +3,7 @@ const { isEqual, isEmpty } = require('lodash');
 const dal = require('../dal');
 const logger = require('../logger');
 const { sortUserMatches, isSubsetOf } = require('./userLogic');
-const { validCreateUserKeys } = require('../consts');
+const { validCreateUserKeys, validGetUsersKeys } = require('../consts');
 
 async function createUser(req, res) {
   const userData = req.body;
@@ -28,7 +28,7 @@ const updateDataIsInvalid = data =>
   isEmpty(data) || !isSubsetOf(validCreateUserKeys, Object.keys(data));
 
 const getUsersQueryIsInvalid = data =>
-  !isSubsetOf(validCreateUserKeys, Object.keys(data));
+  !isSubsetOf(validGetUsersKeys, Object.keys(data));
 
 const respondDataKeysAreInvalid = res => res.status(BAD_REQUEST).send({
   message: 'Some keys are invalid. Make sure to send exactly the right keys',
@@ -65,7 +65,25 @@ async function getUsersByQuery(req, res) {
   if (getUsersQueryIsInvalid(req.query)) {
     return respondDataKeysAreInvalid(res);
   }
-  res.send(await dal.getUsersByQuery(req.query));
+  // If only one of locationX or locationY received
+  else if (req.query.locationX ? !req.query.locationY : req.query.locationY) {
+    return res.status(BAD_REQUEST).send({
+      message: 'locationX and locationY must come together'
+    });
+  }
+  const { locationX, locationY, ...query } = req.query;
+  const { hobbies } = req.query;
+  if (locationX && locationY) {
+    query.location = {
+      x: locationX,
+      y: locationY
+    };
+  }
+  // Inserting hobbies to an array even when there's only 1
+  if (hobbies && !(hobbies instanceof Array)) {
+    query.hobbies = [hobbies];
+  }
+  res.send(await dal.getUsersByQuery(query));
 }
 
 async function postFriends(req, res) {
@@ -102,6 +120,16 @@ async function getFriends(req, res) {
   res.send(await dal.getFriendsById(id));
 }
 
+async function deleteFriends(req, res) {
+  const { id } = req.params;
+  const deleted = await dal.deleteUserFriends(id);
+
+  if (deleted) res.status(OK).end();
+  else res.status(NOT_FOUND).send({
+    message: 'User not found', id
+  });
+}
+
 async function deleteUsers(req, res) {
   await dal.clearTables();
   res.status(OK).end();
@@ -136,6 +164,7 @@ module.exports = {
   getUsersByQuery,
   postFriends,
   getFriends,
+  deleteFriends,
   updateUser,
   getFriendSuggestions
 };

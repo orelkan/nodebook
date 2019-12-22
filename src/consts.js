@@ -10,3 +10,7 @@ exports.validUserKeys = [
 ];
 
 exports.validCreateUserKeys = exports.validUserKeys.filter(key => key !== 'friends');
+
+exports.validGetUsersKeys = exports.validUserKeys
+  .filter(key => key !== 'friends' && key !== 'location')
+  .concat('locationX', 'locationY');

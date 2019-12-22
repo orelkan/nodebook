@@ -105,27 +105,6 @@ async function updateUser(id, updateData) {
   }
 }
 
-function makeWhereQuery(queryObj) {
-  if (!queryObj) return ['', []];
-
-  const keys = Object.keys(queryObj).filter(key => key !== 'hobbies');
-
-  // Note that values are in the same order as the keys
-  const values = keys
-    .map(key => key === 'location' ?
-      stringifyLocation(queryObj[key]) :
-      queryObj[key]
-    );
-
-  const whereQuery = keys
-    .map((key, i) => key === 'location' ?
-      `${key}~=$${i+1}` :
-      `${key}=$${i+1}`
-    ).join(' AND ');
-
-  return [whereQuery, values];
-}
-
 async function deleteUserById(userId) {
   await db.query('DELETE FROM users WHERE id=$1', [userId]);
 }
@@ -137,13 +116,53 @@ function parseRows(rows) {
   }));
 }
 
-async function getUsersByQuery(queryObj) {
-  const [whereQuery, values] = makeWhereQuery(queryObj);
+function makeWhereQuery(queryObj) {
+  if (!queryObj) return { whereQuery: '', values: [] };
+
+  const keys = Object.keys(queryObj);
+
+  // Note that values are in the same order as the keys
+  const values = keys
+    .map(key => key === 'location' ?
+      stringifyLocation(queryObj[key]) :
+      queryObj[key]
+    );
+
+  const whereQuery = keys
+    .map((key, i) => {
+      const bindString = '$' + (i+1);
+      switch(key) {
+      // Location equality operator
+      case 'location':
+        return `${key}~=${bindString}`;
+
+      // Checking the user has these hobbies
+      case 'hobbies':
+        return `(
+          SELECT COUNT(*) FROM hobbies h 
+          WHERE h.user_id = u.id 
+          and h.hobby = ANY (${bindString})
+        ) = ${queryObj.hobbies.length}`;
+      default:
+        return `${key}=${bindString}`;
+      }
+    }
+    ).join(' AND ');
+
   const fullWhereQuery = whereQuery ? `WHERE ${whereQuery}` : '';
+  return { whereQuery: fullWhereQuery, values};
+}
+
+async function getUsersByQuery(queryObj) {
+  const { whereQuery, values } = makeWhereQuery(queryObj);
 
   // The View uses PostgresSQL's STRING_AGG, which concats the string values by delimiter.
   // In Oracle SQL it's called list_agg
-  const fullQuery = `SELECT * FROM users_view ${fullWhereQuery}`;
+  const fullQuery =
+    `SELECT id, first_name, last_name, phone_number, location, gender,
+      relationship_status, interested_in, hobbies
+    FROM users_view u 
+    ${whereQuery}`;
   const result = await db.query(fullQuery, values);
   return parseRows(result.rows);
 }
@@ -213,6 +232,12 @@ async function getUnsortedUserMatches(id) {
   return [user, matches];
 }
 
+async function deleteUserFriends(id) {
+  const query = 'DELETE FROM friends WHERE user_id1 = $1 OR user_id2 = $1';
+  const result = await db.query(query, [id]);
+  return Boolean(result.rowCount);
+}
+
 // Used for tests
 async function createUsers(usersData) {
   return Promise.all(usersData.map(createUser));
@@ -231,6 +256,7 @@ module.exports = {
   updateUser,
   getFriendSuggestions,
   userIdExists,
-  getUnsortedUserMatches
+  getUnsortedUserMatches,
+  deleteUserFriends
 };
 
